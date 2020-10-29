@@ -2,10 +2,7 @@ package paxos;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.Registry;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -146,16 +143,6 @@ public class Paxos implements PaxosRMI, Runnable{
     public int Max(){ return Collections.max(this.agreements.keySet()); }
 
     /**
-     * Min() should return one more than the minimum among z_i,
-     * where z_i is the highest number ever passed
-     * to Done() on peer i. A peers z_i is -1 if it has
-     * never called Done().
-
-     * Paxos is required to have forgotten all information
-     * about any instances it knows that are < Min().
-     * The point is to free up memory in long-running
-     * Paxos-based servers.
-
      * Paxos peers need to exchange their highest Done()
      * arguments in order to implement Min(). These
      * exchanges can be piggybacked on ordinary Paxos
@@ -175,8 +162,25 @@ public class Paxos implements PaxosRMI, Runnable{
      */
     public int Min(){
         this.mutex.lock();
+        /**
+         * Min() should return one more than the minimum among z_i,
+         * where z_i is the highest number ever passed
+         * to Done() on peer i. A peers z_i is -1 if it has
+         * never called Done().
+         */
         int min = Collections.min(this.doneStamps);
-        //todo check agreement states
+        /**
+         * Paxos is required to have forgotten all information
+         * about any instances it knows that are < Min().
+         * The point is to free up memory in long-running
+         * Paxos-based servers.
+         */
+        //todo verify
+        for(Map.Entry<Integer,Agreement> entry : this.agreements.entrySet()){
+            if(entry.getKey()<min && entry.getValue().complete){
+                this.agreements.remove(entry.getKey());
+            }
+        }
         this.mutex.unlock();
         return min+1;
     }
