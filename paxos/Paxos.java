@@ -2,27 +2,30 @@ package paxos;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.Registry;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
+
+import static paxos.State.*;
 
 /**
  * This class is the main class you need to implement paxos instances.
  */
 public class Paxos implements PaxosRMI, Runnable{
-
     ReentrantLock mutex;
     String[] peers; // hostname
     int[] ports; // host port
     int me; // index into peers[]
-
     Registry registry;
     PaxosRMI stub;
-
     AtomicBoolean dead;// for testing
     AtomicBoolean unreliable;// for testing
-
     // Your data here
-
+    private HashMap<Integer, Agreement> agreements;
+    private ArrayList<Integer> doneStamps;
 
     /**
      * Call the constructor to create a Paxos peer.
@@ -37,8 +40,8 @@ public class Paxos implements PaxosRMI, Runnable{
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
         // Your initialization code here
-
-
+        this.agreements = new HashMap<>();
+        this.doneStamps = new ArrayList<>(peers.length);;
         // register peers, do not modify this part
         try{
             System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
@@ -49,7 +52,6 @@ public class Paxos implements PaxosRMI, Runnable{
             e.printStackTrace();
         }
     }
-
 
     /**
      * Call() sends an RMI to the RMI handler on server with
@@ -102,27 +104,24 @@ public class Paxos implements PaxosRMI, Runnable{
      * is reached.
      */
     public void Start(int seq, Object value){
-        // Your code here
+        this.agreements.put(seq,new Agreement(this.me));
     }
 
     @Override
     public void run(){
-        //Your code here
+        
     }
 
     // RMI handler
     public Response Prepare(Request req){
-        // your code here
 
     }
 
     public Response Accept(Request req){
-        // your code here
 
     }
 
     public Response Decide(Request req){
-        // your code here
 
     }
 
@@ -133,7 +132,9 @@ public class Paxos implements PaxosRMI, Runnable{
      * see the comments for Min() for more explanation.
      */
     public void Done(int seq) {
-        // Your code here
+        if(seq<this.doneStamps.get(this.me)) return;
+        this.doneStamps.set(this.me,seq);
+        //todo send out messages
     }
 
 
@@ -142,9 +143,7 @@ public class Paxos implements PaxosRMI, Runnable{
      * highest instance sequence known to
      * this peer.
      */
-    public int Max(){
-        // Your code here
-    }
+    public int Max(){ return Collections.max(this.agreements.keySet()); }
 
     /**
      * Min() should return one more than the minimum among z_i,
@@ -175,11 +174,12 @@ public class Paxos implements PaxosRMI, Runnable{
      * instances.
      */
     public int Min(){
-        // Your code here
-
+        this.mutex.lock();
+        int min = Collections.min(this.doneStamps);
+        //todo check agreement states
+        this.mutex.unlock();
+        return min+1;
     }
-
-
 
     /**
      * the application wants to know whether this
@@ -189,8 +189,11 @@ public class Paxos implements PaxosRMI, Runnable{
      * it should not contact other Paxos peers.
      */
     public retStatus Status(int seq){
-        // Your code here
-
+        if(seq<this.Min()) return new retStatus(Forgotten,null);
+        this.mutex.lock();
+        boolean decided = this.agreements.get(seq).complete;
+        this.mutex.unlock();
+        return decided ? new retStatus(Decided,this.agreements.get(seq).value) : new retStatus(Pending,null);
     }
 
     /**
