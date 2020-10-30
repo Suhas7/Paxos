@@ -102,11 +102,12 @@ public class Paxos implements PaxosRMI, Runnable{
      */
     public void Start(int seq, Object value){
         this.agreements.put(seq,new Agreement(this.me));
+        new Thread(this).start();
     }
 
     @Override
     public void run(){
-        
+
     }
 
     // RMI handler
@@ -129,9 +130,9 @@ public class Paxos implements PaxosRMI, Runnable{
      * see the comments for Min() for more explanation.
      */
     public void Done(int seq) {
-        if(seq<this.doneStamps.get(this.me)) return;
-        this.doneStamps.set(this.me,seq);
-        //todo send out messages
+        if(seq>this.doneStamps.get(this.me)) this.doneStamps.set(this.me,seq);
+        //todo are any messages needed?
+        this.Min();
     }
 
 

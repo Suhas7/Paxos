@@ -10,7 +10,6 @@ import java.io.Serializable;
 public class Request implements Serializable {
     static final long serialVersionUID=1L;
     // Your data here
-
-
+    public int seq;
     // Your constructor and methods here
 }
