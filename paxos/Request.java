@@ -12,18 +12,18 @@ public class Request implements Serializable {
     // Your data here
     public String type;
     public int seq;
-    public int prop;
-    public int val;
+    public int n_a;
+    public int v_a;
     // Your constructor and methods here
-    public Request(int seq, int prop, int val){
-        this.type="Accept";
-        this.seq=seq;
-        this.prop=prop;
-        this.val=val;
+    public Request(int seq, int n_a, int val){
+        this.type = "Accept";
+        this.seq = seq;
+        this.n_a = n_a;
+        this.v_a = val;
     }
-    public Request(int seq, int prop){
-        this.type="Prepare";
-        this.seq=seq;
-        this.prop=prop;
+    public Request(int seq, int n_a){
+        this.type = "Prepare";
+        this.seq = seq;
+        this.n_a = n_a;
     }
 }

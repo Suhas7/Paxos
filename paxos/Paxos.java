@@ -114,10 +114,11 @@ public class Paxos implements PaxosRMI, Runnable{
         int seq = this.seq;
         Object val = this.val;
         while(!this.isDead()){
-            int n = this.Max()+1;
+            this.agreements.get(seq).proposal++;
+            int n = this.agreements.get(seq).proposal;
             int okCount = 0;
             for(int i = 0; i<this.peers.length;i++){
-                Response x = Call("Prepare", new Request(seq, (Integer) val),this.ports[i]);
+                Response x = Call("Prepare", new Request(seq, n, (Integer) val),this.ports[i]);
                 if(x.responseType.equals("Ok")){
                     okCount++;
                     if(x.n>n){
@@ -135,7 +136,7 @@ public class Paxos implements PaxosRMI, Runnable{
                 if(acceptCount>(this.peers.length/2)){
                     Agreement ag =this.agreements.get(seq);
                     ag.complete=true;
-                    ag.value=val;
+                    ag.v_a =val;
                     for (int i = 0; i < this.peers.length; i++) {
                         if(i!=this.me) {
                             Response x = Call("Decide", new Request(seq, (Integer) val), this.ports[i]);
@@ -152,16 +153,16 @@ public class Paxos implements PaxosRMI, Runnable{
         this.mutex.lock();
         if(!this.agreements.keySet().contains(req.seq)){
             //no prepare with this seq has been seen
-            this.agreements.put(req.seq,new Agreement(this.me,req.val));
+            this.agreements.put(req.seq,new Agreement(this.me,req.v_a));
             Agreement x = this.agreements.get(req.seq);
             this.mutex.unlock();
-            return new Response("Ok",req.val,x.accepted,x.value);
-        }else if(this.agreements.get(req.seq).seen<req.prop){
+            return new Response("Ok", x.n_a, x.v_a);
+        }else if(this.agreements.get(req.seq).n_p < req.n_a){
             //prepare better than previous prepare
             Agreement x = this.agreements.get(req.seq);
-            this.agreements.get(req.seq).seen=req.prop;
+            this.agreements.get(req.seq).n_p =req.n_a;
             this.mutex.unlock();
-            return new Response("Ok",req.val,x.accepted,x.value);
+            return new Response("Ok",x.n_a,x.v_a);
         }else{
             //prepare failed, prop value too low
             this.mutex.unlock();
@@ -173,18 +174,18 @@ public class Paxos implements PaxosRMI, Runnable{
         assert req.type.equals("Accept");
         this.mutex.lock();
         if(!this.agreements.keySet().contains(req.seq)){
-            this.agreements.put(req.seq,new Agreement(this.me,req.prop,req.val));
+            this.agreements.put(req.seq,new Agreement(this.me,req.n_a,req.v_a));
         }
         Agreement x = this.agreements.get(req.seq);
-        if (req.prop>=x.seen){
-            x.proposal=req.prop;
-            x.value=req.val;
-            x.accepted=req.prop;
+        if (req.n_a >=x.n_p){
+            x.proposal=req.n_a;
+            x.v_a =req.v_a;
+            x.n_a =req.n_a;
             this.mutex.unlock();
-            return new Response("AcceptOk");
+            return new Response("AcceptOk", x.n_a, x.v_a);
         }else{
             this.mutex.unlock();
-            return new Response("AcceptReject");
+            return new Response("AcceptReject", x.n_a, x.v_a);
         }
     }
 
@@ -193,14 +194,14 @@ public class Paxos implements PaxosRMI, Runnable{
         this.mutex.lock();
         if(!this.agreements.keySet().contains(req.seq)){
             //make agreement w known value and mark as final
-            this.agreements.put(req.seq,new Agreement(true,req.val));
+            this.agreements.put(req.seq,new Agreement(true,req.v_a));
         }else{
             //mark according entry as final and update value
             this.agreements.get(req.seq).complete=true;
-            this.agreements.get(req.seq).value=req.val;
+            this.agreements.get(req.seq).v_a =req.v_a;
         }
         this.mutex.unlock();
-        return new Response("Done");
+        return new Response("Done", this.agreements.get(req.seq).n_a, this.agreements.get(req.seq).v_a);
     }
 
     /**
@@ -279,7 +280,7 @@ public class Paxos implements PaxosRMI, Runnable{
         this.mutex.lock();
         boolean decided = this.agreements.get(seq).complete;
         this.mutex.unlock();
-        return decided ? new retStatus(Decided,this.agreements.get(seq).value) : new retStatus(Pending,null);
+        return decided ? new retStatus(Decided,this.agreements.get(seq).v_a) : new retStatus(Pending,null);
     }
 
     /**

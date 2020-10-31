@@ -26,7 +26,7 @@ public class Response implements Serializable {
         this.v_a=value;
     }
 
-    public Response(String type) {
+    public Response(String type, int n_a, Object v_a) {
         this.responseType=type;
     }
 
