@@ -112,15 +112,48 @@ public class Paxos implements PaxosRMI, Runnable{
 
     // RMI handler
     public Response Prepare(Request req){
+        assert req.type.equals("Prepare");
+        this.mutex.lock();
+        if(!this.agreements.keySet().contains(req.seq)){
+            //todo no prepare with this seq has been seen
+            this.agreements.put(req.seq,new Agreement(this.me,req.val));
+            this.mutex.unlock();
+            return new Response();
+        }else if(this.agreements.get(req.seq).seen<req.prop){
+            //todo prepare better than previous prepare
 
+            this.mutex.unlock();
+            return new Response();
+        }else{
+            //todo prepare failed?
+            this.mutex.unlock();
+            return new Response();
+        }
     }
 
     public Response Accept(Request req){
+        assert req.type.equals("Accept");
+        this.mutex.lock();
+        if(!this.agreements.keySet().contains(req.seq)){
+            this.agreements.put(req.seq,new Agreement(this.me,req.prop,req.val));
+        } else if (req.prop>=this.agreements.get(req.seq).seen){
 
+        }
     }
 
     public Response Decide(Request req){
-
+        assert req.type.equals("Decide");
+        this.mutex.lock();
+        if(!this.agreements.keySet().contains(req.seq)){
+            //make agreement w known value and mark as final
+            this.agreements.put(req.seq,new Agreement(true,req.val));
+        }else{
+            //mark according entry as final and update value
+            this.agreements.get(req.seq).complete=true;
+            this.agreements.get(req.seq).value=req.val;
+        }
+        this.mutex.unlock();
+        //todo return response
     }
 
     /**
@@ -132,6 +165,14 @@ public class Paxos implements PaxosRMI, Runnable{
     public void Done(int seq) {
         if(seq>this.doneStamps.get(this.me)) this.doneStamps.set(this.me,seq);
         //todo are any messages needed?
+        /** don't think so due to:
+         * "Paxos peers need to exchange their highest Done()
+         * arguments in order to implement Min(). These
+         * exchanges can be piggybacked on ordinary Paxos
+         * agreement protocol messages, so it is OK if one
+         * peers Min does not reflect another Peers Done()
+         * until after the next instance is agreed to."
+         */
         this.Min();
     }
 
@@ -144,13 +185,6 @@ public class Paxos implements PaxosRMI, Runnable{
     public int Max(){ return Collections.max(this.agreements.keySet()); }
 
     /**
-     * Paxos peers need to exchange their highest Done()
-     * arguments in order to implement Min(). These
-     * exchanges can be piggybacked on ordinary Paxos
-     * agreement protocol messages, so it is OK if one
-     * peers Min does not reflect another Peers Done()
-     * until after the next instance is agreed to.
-
      * The fact that Min() is defined as a minimum over
      * all Paxos peers means that Min() cannot increase until
      * all peers have been heard from. So if a peer is dead
