@@ -9,25 +9,25 @@ import java.io.Serializable;
 public class Response implements Serializable {
     static final long serialVersionUID=2L;
     // your data here
+    int n, n_a;
     Object v_a;
-    int n_p, n;
-    Object data;
     String responseType;
     // Your constructor and methods here
-    public Response(String type, Object data){
+    public Response(String type){
         this.responseType=type;
-        this.data=data;
-    }
-
-    public Response(String ok, int val, int accepted, Object value) {
-        this.responseType=ok;
-        this.n=val;
-        this.n_p=accepted;
-        this.v_a=value;
     }
 
     public Response(String type, int n_a, Object v_a) {
         this.responseType=type;
+        this.v_a=v_a;
+        this.n_a=n_a;
+    }
+
+    public Response(String type, int p_n, int n_a, Object v_a) {
+        this.responseType=type;
+        this.v_a = v_a;
+        this.n_a =n_a;
+        this.n = p_n;
     }
 
     public boolean equals(String obj) {

@@ -22,7 +22,7 @@ public class Paxos implements PaxosRMI, Runnable{
     AtomicBoolean unreliable;// for testing
     // Your data here
     private HashMap<Integer, Agreement> agreements;
-    private ArrayList<Integer> doneStamps;
+    private List<Integer> doneStamps;
     private int seq;
     private Object val;
 
@@ -104,6 +104,7 @@ public class Paxos implements PaxosRMI, Runnable{
      */
     public void Start(int seq, Object value){
         this.agreements.put(seq,new Agreement(this.me,value));
+        //temporarily store vars pass to instantiated thread
         this.seq=seq;
         this.val=value;
         new Thread(this).start();
@@ -114,35 +115,32 @@ public class Paxos implements PaxosRMI, Runnable{
         int seq = this.seq;
         Object val = this.val;
         while(!this.isDead()){
-            this.agreements.get(seq).proposal++;
+            this.agreements.get(seq).proposal++; //todo is this sufficient
             int n = this.agreements.get(seq).proposal;
-            int okCount = 0;
-            for(int i = 0; i<this.peers.length;i++){
-                Response x = Call("Prepare", new Request(seq, n, (Integer) val),this.ports[i]);
+            int count = 0;
+            final int majority = this.peers.length/2;
+            for(int port : this.ports){
+                Response x = Call("Prepare", new Request(seq, n), port);
                 if(x.responseType.equals("Ok")){
-                    okCount++;
+                    count++;
                     if(x.n>n){
-                        n=x.n;
-                        val=x.v_a;
+                        n = x.n;
+                        val = x.v_a;
                     }
                 }
             }
-            if(okCount>(this.peers.length/2)) {
-                int acceptCount = 0;
-                for (int i = 0; i < this.peers.length; i++) {
-                    Response x = Call("Accept",new Request(seq,(Integer) val), this.ports[i]);
-                    if(x.responseType.equals("AcceptOk")) acceptCount++;
-                }
-                if(acceptCount>(this.peers.length/2)){
-                    Agreement ag =this.agreements.get(seq);
-                    ag.complete=true;
-                    ag.v_a =val;
-                    for (int i = 0; i < this.peers.length; i++) {
-                        if(i!=this.me) {
-                            Response x = Call("Decide", new Request(seq, (Integer) val), this.ports[i]);
-                        }
-                    }
-                }
+            if(count<=majority) return;
+            count = 0;
+            for(int port : this.ports)
+                if(Call("Accept",new Request(seq, n, (Integer) val), port)
+                        .responseType.equals("AcceptOk")) count++;
+            if(count>majority){
+                Agreement ag = this.agreements.get(seq);
+                ag.complete=true;
+                ag.v_a =val;
+                for (int i = 0; i < this.peers.length; i++)
+                    Call("Decide", new Request(seq, (Integer) val), this.ports[i]);
+                return;
             }
         }
     }
@@ -153,20 +151,18 @@ public class Paxos implements PaxosRMI, Runnable{
         this.mutex.lock();
         if(!this.agreements.keySet().contains(req.seq)){
             //no prepare with this seq has been seen
-            this.agreements.put(req.seq,new Agreement(this.me,req.v_a));
+            this.agreements.put(req.seq,new Agreement(req.p_n,req.p_n,req.v_a,this.me));
+        }
+        if(this.agreements.get(req.seq).n_p < req.p_n){
+            //prepare better than previous prepare todo are the args right
             Agreement x = this.agreements.get(req.seq);
+            this.agreements.get(req.seq).n_p = req.p_n;
             this.mutex.unlock();
-            return new Response("Ok", x.n_a, x.v_a);
-        }else if(this.agreements.get(req.seq).n_p < req.n_a){
-            //prepare better than previous prepare
-            Agreement x = this.agreements.get(req.seq);
-            this.agreements.get(req.seq).n_p =req.n_a;
-            this.mutex.unlock();
-            return new Response("Ok",x.n_a,x.v_a);
+            return new Response("Ok",req.p_n,x.n_a,x.v_a);
         }else{
             //prepare failed, prop value too low
             this.mutex.unlock();
-            return new Response("Reject",null);
+            return new Response("Reject");
         }
     }
 
@@ -174,18 +170,18 @@ public class Paxos implements PaxosRMI, Runnable{
         assert req.type.equals("Accept");
         this.mutex.lock();
         if(!this.agreements.keySet().contains(req.seq)){
-            this.agreements.put(req.seq,new Agreement(this.me,req.n_a,req.v_a));
+            this.agreements.put(req.seq,new Agreement(req.p_n, req.p_n,req.v_a,this.me));
         }
         Agreement x = this.agreements.get(req.seq);
-        if (req.n_a >=x.n_p){
-            x.proposal=req.n_a;
-            x.v_a =req.v_a;
-            x.n_a =req.n_a;
+        if (req.p_n >=x.n_p){
+            x.proposal=req.p_n;
+            x.n_a = req.p_n;
+            x.v_a = req.v_a;
             this.mutex.unlock();
             return new Response("AcceptOk", x.n_a, x.v_a);
         }else{
             this.mutex.unlock();
-            return new Response("AcceptReject", x.n_a, x.v_a);
+            return new Response("AcceptReject");
         }
     }
 
@@ -207,21 +203,20 @@ public class Paxos implements PaxosRMI, Runnable{
     /**
      * The application on this machine is done with
      * all instances <= seq.
-     *
      * see the comments for Min() for more explanation.
+     *
+     * "Paxos peers need to exchange their highest Done()
+     * arguments in order to implement Min(). These
+     * exchanges can be piggybacked on ordinary Paxos
+     * agreement protocol messages, so it is OK if one
+     * peers Min does not reflect another Peers Done()
+     * until after the next instance is agreed to."
      */
     public void Done(int seq) {
-        if(seq>this.doneStamps.get(this.me)) this.doneStamps.set(this.me,seq);
-        //todo are any messages needed?
-        /** don't think so due to:
-         * "Paxos peers need to exchange their highest Done()
-         * arguments in order to implement Min(). These
-         * exchanges can be piggybacked on ordinary Paxos
-         * agreement protocol messages, so it is OK if one
-         * peers Min does not reflect another Peers Done()
-         * until after the next instance is agreed to."
-         */
-        this.Min();
+        if(seq>this.doneStamps.get(this.me)) {
+            this.doneStamps.set(this.me, seq);
+            this.Min();
+        }
     }
 
 
@@ -278,7 +273,9 @@ public class Paxos implements PaxosRMI, Runnable{
     public retStatus Status(int seq){
         if(seq<this.Min()) return new retStatus(Forgotten,null);
         this.mutex.lock();
-        boolean decided = this.agreements.get(seq).complete;
+        boolean decided;
+        if(!this.agreements.keySet().contains(seq)) decided = false;
+        else decided = this.agreements.get(seq).complete;
         this.mutex.unlock();
         return decided ? new retStatus(Decided,this.agreements.get(seq).v_a) : new retStatus(Pending,null);
     }
