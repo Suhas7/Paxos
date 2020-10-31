@@ -23,6 +23,8 @@ public class Paxos implements PaxosRMI, Runnable{
     // Your data here
     private HashMap<Integer, Agreement> agreements;
     private ArrayList<Integer> doneStamps;
+    private int seq;
+    private Object val;
 
     /**
      * Call the constructor to create a Paxos peer.
@@ -102,12 +104,46 @@ public class Paxos implements PaxosRMI, Runnable{
      */
     public void Start(int seq, Object value){
         this.agreements.put(seq,new Agreement(this.me,value));
+        this.seq=seq;
+        this.val=value;
         new Thread(this).start();
     }
 
     @Override
     public void run(){
-
+        int seq = this.seq;
+        Object val = this.val;
+        while(!this.isDead()){
+            int n = this.Max()+1;
+            int okCount = 0;
+            for(int i = 0; i<this.peers.length;i++){
+                Response x = Call("Prepare", new Request(seq, (Integer) val),this.ports[i]);
+                if(x.responseType.equals("Ok")){
+                    okCount++;
+                    if(x.n>n){
+                        n=x.n;
+                        val=x.v_a;
+                    }
+                }
+            }
+            if(okCount>(this.peers.length/2)) {
+                int acceptCount = 0;
+                for (int i = 0; i < this.peers.length; i++) {
+                    Response x = Call("Accept",new Request(seq,(Integer) val), this.ports[i]);
+                    if(x.responseType.equals("AcceptOk")) acceptCount++;
+                }
+                if(acceptCount>(this.peers.length/2)){
+                    Agreement ag =this.agreements.get(seq);
+                    ag.complete=true;
+                    ag.value=val;
+                    for (int i = 0; i < this.peers.length; i++) {
+                        if(i!=this.me) {
+                            Response x = Call("Decide", new Request(seq, (Integer) val), this.ports[i]);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // RMI handler
@@ -164,7 +200,7 @@ public class Paxos implements PaxosRMI, Runnable{
             this.agreements.get(req.seq).value=req.val;
         }
         this.mutex.unlock();
-        //todo return response
+        return new Response("Done");
     }
 
     /**
