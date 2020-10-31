@@ -101,7 +101,7 @@ public class Paxos implements PaxosRMI, Runnable{
      * is reached.
      */
     public void Start(int seq, Object value){
-        this.agreements.put(seq,new Agreement(this.me));
+        this.agreements.put(seq,new Agreement(this.me,value));
         new Thread(this).start();
     }
 
