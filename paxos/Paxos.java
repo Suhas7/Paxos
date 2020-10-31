@@ -115,19 +115,21 @@ public class Paxos implements PaxosRMI, Runnable{
         assert req.type.equals("Prepare");
         this.mutex.lock();
         if(!this.agreements.keySet().contains(req.seq)){
-            //todo no prepare with this seq has been seen
+            //no prepare with this seq has been seen
             this.agreements.put(req.seq,new Agreement(this.me,req.val));
+            Agreement x = this.agreements.get(req.seq);
             this.mutex.unlock();
-            return new Response();
+            return new Response("Ok",req.val,x.accepted,x.value);
         }else if(this.agreements.get(req.seq).seen<req.prop){
-            //todo prepare better than previous prepare
-
+            //prepare better than previous prepare
+            Agreement x = this.agreements.get(req.seq);
+            this.agreements.get(req.seq).seen=req.prop;
             this.mutex.unlock();
-            return new Response();
+            return new Response("Ok",req.val,x.accepted,x.value);
         }else{
-            //todo prepare failed?
+            //prepare failed, prop value too low
             this.mutex.unlock();
-            return new Response();
+            return new Response("Reject",null);
         }
     }
 
@@ -136,8 +138,17 @@ public class Paxos implements PaxosRMI, Runnable{
         this.mutex.lock();
         if(!this.agreements.keySet().contains(req.seq)){
             this.agreements.put(req.seq,new Agreement(this.me,req.prop,req.val));
-        } else if (req.prop>=this.agreements.get(req.seq).seen){
-
+        }
+        Agreement x = this.agreements.get(req.seq);
+        if (req.prop>=x.seen){
+            x.proposal=req.prop;
+            x.value=req.val;
+            x.accepted=req.prop;
+            this.mutex.unlock();
+            return new Response("AcceptOk");
+        }else{
+            this.mutex.unlock();
+            return new Response("AcceptReject");
         }
     }
 
