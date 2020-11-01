@@ -132,7 +132,7 @@ public class Paxos implements PaxosRMI, Runnable{
             }
             if(count<=majority) return;
             count = 0;
-            for(int port = 0;port < this.ports.length; port++){
+            for(int port = 0;port < this.ports.length; port++)
                 if(Call("Accept",new Request(seq, n, (Integer) val), port)
                         .responseType.equals("AcceptOk")) count++;
             if(count>majority){
@@ -170,7 +170,7 @@ public class Paxos implements PaxosRMI, Runnable{
     public Response Accept(Request req){
         assert req.type.equals("Accept");
         this.mutex.lock();
-        if(!this.agreements.keySet().contains(req.seq)){
+        if(!this.agreements.containsKey(req.seq)){
             this.agreements.put(req.seq,new Agreement(req.p_n, req.p_n,req.v_a,this.me));
         }
         Agreement x = this.agreements.get(req.seq);
@@ -189,7 +189,7 @@ public class Paxos implements PaxosRMI, Runnable{
     public Response Decide(Request req){
         assert req.type.equals("Decide");
         this.mutex.lock();
-        if(!this.agreements.keySet().contains(req.seq)){
+        if(!this.agreements.containsKey(req.seq)){
             //make agreement w known value and mark as final
             this.agreements.put(req.seq,new Agreement(true,req.v_a));
         }else{
@@ -275,7 +275,7 @@ public class Paxos implements PaxosRMI, Runnable{
         if(seq<this.Min()) return new retStatus(Forgotten,null);
         this.mutex.lock();
         boolean decided;
-        if(!this.agreements.keySet().contains(seq)) decided = false;
+        if(!this.agreements.containsKey(seq)) decided = false;
         else decided = this.agreements.get(seq).complete;
         this.mutex.unlock();
         return decided ? new retStatus(Decided,this.agreements.get(seq).v_a) : new retStatus(Pending,null);
