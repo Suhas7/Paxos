@@ -40,7 +40,8 @@ public class Paxos implements PaxosRMI, Runnable{
         this.unreliable = new AtomicBoolean(false);
         // Your initialization code here
         this.agreements = new HashMap<>();
-        this.doneStamps = new ArrayList<>(peers.length);;
+        this.doneStamps = new ArrayList<>(Arrays.asList(new Integer[peers.length]));
+        Collections.fill(this.doneStamps,0);
         // register peers, do not modify this part
         try{
             System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
@@ -115,11 +116,11 @@ public class Paxos implements PaxosRMI, Runnable{
         int seq = this.seq;
         Object val = this.val;
         while(!this.isDead()){
-            this.agreements.get(seq).proposal++; //todo is this sufficient
             int n = this.agreements.get(seq).proposal;
+            this.agreements.get(seq).proposal++; //todo is this sufficient
             int count = 0;
             final int majority = this.peers.length/2;
-            for(int port : this.ports){
+            for(int port = 0; port < this.ports.length; port++){
                 Response x = Call("Prepare", new Request(seq, n), port);
                 if(x.responseType.equals("Ok")){
                     count++;
@@ -131,7 +132,7 @@ public class Paxos implements PaxosRMI, Runnable{
             }
             if(count<=majority) return;
             count = 0;
-            for(int port : this.ports)
+            for(int port = 0;port < this.ports.length; port++){
                 if(Call("Accept",new Request(seq, n, (Integer) val), port)
                         .responseType.equals("AcceptOk")) count++;
             if(count>majority){
@@ -149,7 +150,7 @@ public class Paxos implements PaxosRMI, Runnable{
     public Response Prepare(Request req){
         assert req.type.equals("Prepare");
         this.mutex.lock();
-        if(!this.agreements.keySet().contains(req.seq)){
+        if(!this.agreements.containsKey(req.seq)){
             //no prepare with this seq has been seen
             this.agreements.put(req.seq,new Agreement(req.p_n,req.p_n,req.v_a,this.me));
         }
