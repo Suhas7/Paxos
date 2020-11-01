@@ -1,4 +1,5 @@
 package paxos;
+import java.io.Serializable;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.Registry;
@@ -24,7 +25,7 @@ public class Paxos implements PaxosRMI, Runnable{
     private HashMap<Integer, Agreement> agreements;
     private List<Integer> doneStamps;
     private int seq;
-    private Object val;
+    private Serializable val;
 
     /**
      * Call the constructor to create a Paxos peer.
@@ -103,7 +104,7 @@ public class Paxos implements PaxosRMI, Runnable{
      * The application will call Status() to find out if/when agreement
      * is reached.
      */
-    public void Start(int seq, Object value){
+    public void Start(int seq, Serializable value){
         this.agreements.put(seq,new Agreement(this.me,value));
         //temporarily store vars pass to instantiated thread
         this.seq=seq;
@@ -114,7 +115,7 @@ public class Paxos implements PaxosRMI, Runnable{
     @Override
     public void run(){
         int seq = this.seq;
-        Object val = this.val;
+        Serializable val = this.val;
         while(!this.isDead()){
             int n = this.agreements.get(seq).proposal;
             this.agreements.get(seq).proposal++; //todo is this sufficient
@@ -130,17 +131,17 @@ public class Paxos implements PaxosRMI, Runnable{
                     }
                 }
             }
-            if(count<=majority) return;
+            if(count<=majority) continue;
             count = 0;
             for(int port = 0;port < this.ports.length; port++)
-                if(Call("Accept",new Request(seq, n, (Integer) val), port)
+                if(Call("Accept",new Request(seq, n, (Serializable) val), port)
                         .responseType.equals("AcceptOk")) count++;
             if(count>majority){
                 Agreement ag = this.agreements.get(seq);
                 ag.complete=true;
-                ag.v_a =val;
+                ag.v_a = val;
                 for (int i = 0; i < this.peers.length; i++)
-                    Call("Decide", new Request(seq, (Integer) val), this.ports[i]);
+                    Call("Decide", new Request(seq, n, (Serializable) val), this.ports[i]);
                 return;
             }
         }
