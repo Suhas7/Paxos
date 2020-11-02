@@ -164,14 +164,12 @@ public class Paxos implements PaxosRMI, Runnable{
         }
         if(this.agreements.get(req.seq).n_p < req.p_n){
             //prepare better than previous prepare todo are the args right
+            this.agreements.put(req.seq,new Agreement(req.p_n,req.p_n,req.v_a));
             Agreement x = this.agreements.get(req.seq);
-            this.agreements.get(req.seq).n_p = req.p_n;
-            this.agreements.get(req.seq).v_a = req.v_a;
             this.mutex.unlock();
             return new Response("Ok",req.p_n,x.n_a,x.v_a);
         }else{
             //prepare failed, prop value too low
-            Agreement x = this.agreements.get(req.seq);
             this.mutex.unlock();
             return new Response("Reject");
         }
@@ -180,13 +178,13 @@ public class Paxos implements PaxosRMI, Runnable{
     public Response Accept(Request req){
         assert req.type.equals("Accept");
         this.mutex.lock();
-        if(!this.agreements.containsKey(req.seq)){
+        if(!this.agreements.containsKey(req.seq))
             this.agreements.put(req.seq,new Agreement(req.p_n, req.p_n,req.v_a));
-        }
         Agreement x = this.agreements.get(req.seq);
         if (req.p_n >=x.n_p){
             x.n_a = req.p_n;
             x.v_a = req.v_a;
+            x.complete = false;
             this.mutex.unlock();
             return new Response("AcceptOk", x.n_a, x.v_a);
         }else{
@@ -257,6 +255,9 @@ public class Paxos implements PaxosRMI, Runnable{
          * never called Done().
          */
         int min = Collections.min(this.doneStamps);
+
+        if (min == 0) min = -1;
+
         /**
          * Paxos is required to have forgotten all information
          * about any instances it knows that are < Min().
@@ -267,6 +268,7 @@ public class Paxos implements PaxosRMI, Runnable{
         for(Map.Entry<Integer,Agreement> entry : this.agreements.entrySet())
             if(entry.getKey()<min && entry.getValue().complete)
                 this.agreements.remove(entry.getKey());
+
         this.mutex.unlock();
         return min+1;
     }
