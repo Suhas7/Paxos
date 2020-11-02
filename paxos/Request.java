@@ -20,8 +20,8 @@ public class Request implements Serializable {
         this.seq = seq;
         this.p_n = n;
     }
-    public Request(int seq, int n, Serializable val){
-        this.type = "Accept";
+    public Request(String type, int seq, int n, Serializable val){
+        this.type = type;
         this.seq = seq;
         this.p_n = n;
         this.v_a = val;
