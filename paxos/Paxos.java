@@ -105,7 +105,8 @@ public class Paxos implements PaxosRMI, Runnable{
      * is reached.
      */
     public void Start(int seq, Serializable value){
-        this.agreements.put(seq,new Agreement(0,value));
+        if(!this.agreements.containsKey(seq)) this.agreements.put(seq,new Agreement(0,value));
+        else this.agreements.put(seq, new Agreement(this.agreements.get(seq).n_a,value));
         //temporarily store vars pass to instantiated thread
         this.seq=seq;
         this.val=value;
