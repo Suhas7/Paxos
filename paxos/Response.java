@@ -16,20 +16,17 @@ public class Response implements Serializable {
     public Response(String type){
         this.responseType=type;
     }
-
     public Response(String type, int n_a, Serializable v_a) {
         this.responseType=type;
         this.v_a=v_a;
         this.n_a=n_a;
     }
-
     public Response(String type, int p_n, int n_a, Serializable v_a) {
         this.responseType=type;
         this.v_a = v_a;
         this.n_a =n_a;
         this.n = p_n;
     }
-
     public boolean equals(String obj) {
         return this.responseType.equals(obj);
     }

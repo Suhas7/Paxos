@@ -119,13 +119,13 @@ public class Paxos implements PaxosRMI, Runnable{
         while(!this.isDead()){
             this.agreements.get(seq).n_p++; //todo is this sufficient
             int n = this.agreements.get(seq).n_p;
-            int count = 0;
-            final int majority = this.peers.length/2;
+            int count = 1;
+            final int majority = 1+this.peers.length/2;
             for(int port = 0; port < this.ports.length; port++){
                 Response x = Call("Prepare", new Request(seq, n), port);
-                if(x.responseType.equals("Ok")){
+                if(x!=null && x.responseType.equals("Ok")){
                     count++;
-                    if(x.n>n){
+                    if(x.n > n){
                         n = x.n;
                         val = x.v_a;
                     }
@@ -134,7 +134,7 @@ public class Paxos implements PaxosRMI, Runnable{
             if(count<=majority) continue;
             count = 0;
             for(int port = 0; port < this.ports.length; port++)
-                if(Call("Accept",new Request("Accept",seq, n, (Serializable) val), port)
+                if(Call("Accept",new Request("Accept",seq, n, val), port)
                         .responseType.equals("AcceptOk")) count++;
             if(count>majority){
                 Agreement ag = this.agreements.get(seq);
