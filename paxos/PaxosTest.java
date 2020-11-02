@@ -125,14 +125,11 @@ public class PaxosTest {
 
     @Test
     public void TestDeaf(){
-
         final int npaxos = 5;
         Paxos[] pxa = initPaxos(npaxos);
-
         System.out.println("Test: Deaf proposer ...");
         pxa[0].Start(0, "hello");
         waitn(pxa, 0, npaxos);
-
         pxa[1].ports[0]= 1;
         pxa[1].ports[npaxos-1]= 1;
         pxa[1].Start(1, "goodbye");

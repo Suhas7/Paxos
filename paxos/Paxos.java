@@ -117,8 +117,8 @@ public class Paxos implements PaxosRMI, Runnable{
         int seq = this.seq;
         Serializable val = this.val;
         while(!this.isDead()){
-            int n = this.agreements.get(seq).n_p;
             this.agreements.get(seq).n_p++; //todo is this sufficient
+            int n = this.agreements.get(seq).n_p;
             int count = 0;
             final int majority = this.peers.length/2;
             for(int port = 0; port < this.ports.length; port++){
@@ -140,8 +140,9 @@ public class Paxos implements PaxosRMI, Runnable{
                 Agreement ag = this.agreements.get(seq);
                 ag.complete=true;
                 ag.v_a = val;
-                for (int i = 0; i < this.peers.length; i++)
+                Response z = null;
                 for (int i = 0; i < this.peers.length; i++) {
+                    z = Call("Decide", new Request("Decide",seq, n, val), i);
                 }
                 return;
             }
@@ -220,7 +221,7 @@ public class Paxos implements PaxosRMI, Runnable{
     public void Done(int seq) {
         if(seq>this.doneStamps.get(this.me)) {
             this.doneStamps.set(this.me, seq);
-            this.Min();
+            //this.Min();
         }
     }
 
@@ -274,7 +275,7 @@ public class Paxos implements PaxosRMI, Runnable{
      * it should not contact other Paxos peers.
      */
     public retStatus Status(int seq){
-        if(seq<this.Min()) return new retStatus(Forgotten,null);
+        //if(seq<this.Min()) return new retStatus(Forgotten,null);
         this.mutex.lock();
         boolean decided;
         if(!this.agreements.containsKey(seq)) decided = false;
