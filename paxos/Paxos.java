@@ -165,10 +165,12 @@ public class Paxos implements PaxosRMI, Runnable{
             //prepare better than previous prepare todo are the args right
             Agreement x = this.agreements.get(req.seq);
             this.agreements.get(req.seq).n_p = req.p_n;
+            this.agreements.get(req.seq).v_a = req.v_a;
             this.mutex.unlock();
             return new Response("Ok",req.p_n,x.n_a,x.v_a);
         }else{
             //prepare failed, prop value too low
+            Agreement x = this.agreements.get(req.seq);
             this.mutex.unlock();
             return new Response("Reject");
         }
@@ -222,7 +224,7 @@ public class Paxos implements PaxosRMI, Runnable{
     public void Done(int seq) {
         if(seq>this.doneStamps.get(this.me)) {
             this.doneStamps.set(this.me, seq);
-            //this.Min();
+//            this.Min();
         }
     }
 
