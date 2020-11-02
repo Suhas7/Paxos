@@ -131,12 +131,13 @@ public class Paxos implements PaxosRMI, Runnable{
                     }
                 }
             }
-            if(count<=majority) continue;
+            if(count<majority) continue;
             count = 0;
-            for(int port = 0; port < this.ports.length; port++)
-                if(Call("Accept",new Request("Accept",seq, n, val), port)
-                        .responseType.equals("AcceptOk")) count++;
-            if(count>majority){
+            for(int port = 0; port < this.ports.length; port++) {
+                Response x = Call("Accept", new Request("Accept", seq, n, val), port);
+                if (x != null && x.responseType.equals("AcceptOk")) count++;
+            }
+            if(count>=majority){
                 Agreement ag = this.agreements.get(seq);
                 ag.complete=true;
                 ag.v_a = val;
