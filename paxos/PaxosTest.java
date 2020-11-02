@@ -79,7 +79,6 @@ public class PaxosTest {
 
     @Test
     public void TestBasic(){
-
         final int npaxos = 5;
         Paxos[] pxa = initPaxos(npaxos);
 

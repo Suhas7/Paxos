@@ -3,22 +3,19 @@ package paxos;
 import java.io.Serializable;
 
 public class Agreement {
-    int proposal;
     int n_p;
     int n_a;
     Serializable v_a;
     boolean complete;
-    public Agreement(int me, Serializable v_a){
+    public Agreement(int n, Serializable v_a){
         this.v_a = v_a;
-        n_a = n_p  = 0;
-        this.proposal = me;
+        n_a = n_p  = n;
         complete = false;
     }
-    public Agreement(int n_p, int n_a, Serializable v_a, int prop){
+    public Agreement(int n_p, int n_a, Serializable v_a){
         this.n_p = n_p;
         this.n_a = n_a;
         this.v_a = v_a;
-        this.proposal = prop;
         this.complete = false;
     }
 
