@@ -119,9 +119,9 @@ public class Paxos implements PaxosRMI, Runnable{
         Serializable val = this.val;
         while(!this.isDead()){
             this.agreements.get(seq).n_p++; //todo is this sufficient
-            int n = this.agreements.get(seq).n_p*6+this.me;
+            int n = this.agreements.get(seq).n_p;
             int count = 1;
-            final int majority = 1+this.peers.length/2;
+            final int majority = 1 + this.peers.length/2;
             for(int port = 0; port < this.ports.length; port++){
                 Response x;
                 if(port!=this.me) x = Call("Prepare", new Request(seq, n), port);
@@ -134,7 +134,7 @@ public class Paxos implements PaxosRMI, Runnable{
                     }
                 }
             }
-            if(count<majority) continue;
+            if(count < majority) continue;
             count = 0;
             for(int port = 0; port < this.ports.length; port++) {
                 Response x;
@@ -142,7 +142,7 @@ public class Paxos implements PaxosRMI, Runnable{
                 else x = this.Accept(new Request("Accept", seq, n, val));
                 if (x != null && x.responseType.equals("AcceptOk")) count++;
             }
-            if(count>=majority){
+            if(count >= majority){
                 Agreement ag = this.agreements.get(seq);
                 ag.complete=true;
                 ag.v_a = val;
@@ -162,10 +162,10 @@ public class Paxos implements PaxosRMI, Runnable{
         this.mutex.lock();
         if(!this.agreements.containsKey(req.seq)){
             //no prepare with this seq has been seen
-            this.agreements.put(req.seq,new Agreement(req.p_n,req.p_n,req.v_a));
+            this.agreements.put(req.seq, new Agreement(req.p_n,req.p_n,req.v_a));
             Agreement x = this.agreements.get(req.seq);
             this.mutex.unlock();
-            return new Response("Ok",req.p_n,x.n_a,x.v_a);
+            return new Response("Ok", req.p_n,x.n_a,x.v_a);
         }
         if(this.agreements.get(req.seq).n_p < req.p_n){
             //prepare better than previous prepare todo are the args right
