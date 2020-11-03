@@ -24,6 +24,7 @@ public class Paxos implements PaxosRMI, Runnable{
     // Your data here
     private HashMap<Integer, Agreement> agreements;
     private List<Integer> doneStamps;
+    private int proposalNum;
     private int seq;
     private Serializable val;
 
@@ -42,7 +43,8 @@ public class Paxos implements PaxosRMI, Runnable{
         // Your initialization code here
         this.agreements = new HashMap<>();
         this.doneStamps = new ArrayList<>(Arrays.asList(new Integer[peers.length]));
-        Collections.fill(this.doneStamps,0);
+        this.proposalNum = this.me - this.peers.length;
+        Collections.fill(this.doneStamps,-1);
         // register peers, do not modify this part
         try{
             System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
@@ -118,10 +120,14 @@ public class Paxos implements PaxosRMI, Runnable{
         int seq = this.seq;
         Serializable val = this.val;
         while(!this.isDead()){
-            this.agreements.get(seq).n_p++; //todo is this sufficient
-            int n = this.agreements.get(seq).n_p;
+            // get unique proposal id
+            int n = this.proposalNum + this.peers.length;
+            this.proposalNum = this.proposalNum + this.peers.length;
+
+            final int majority = 1 + this.peers.length / 2;
+
+            // start counter for promise messages
             int count = 1;
-            final int majority = 1 + this.peers.length/2;
             for(int port = 0; port < this.ports.length; port++){
                 Response x;
                 if(port!=this.me) x = Call("Prepare", new Request(seq, n), port);
@@ -134,14 +140,19 @@ public class Paxos implements PaxosRMI, Runnable{
                     }
                 }
             }
+            // no paxos iteration if promise messages is not priority
             if(count < majority) continue;
-            count = 0;
+
+            // start counter for accept messages
+            count = 1;
             for(int port = 0; port < this.ports.length; port++) {
                 Response x;
                 if(port != this.me) x = Call("Accept", new Request("Accept", seq, n, val), port);
                 else x = this.Accept(new Request("Accept", seq, n, val));
                 if (x != null && x.responseType.equals("AcceptOk")) count++;
             }
+
+
             if(count >= majority){
                 Agreement ag = this.agreements.get(seq);
                 ag.complete=true;
@@ -201,14 +212,14 @@ public class Paxos implements PaxosRMI, Runnable{
     public Response Decide(Request req){
         assert req.type.equals("Decide");
         this.mutex.lock();
-        if(!this.agreements.containsKey(req.seq)){
+        //if(!this.agreements.containsKey(req.seq)){
             //make agreement w known value and mark as final
-            this.agreements.put(req.seq,new Agreement(true,req.v_a));
-        }else{
+        //    this.agreements.put(req.seq,new Agreement(true,req.v_a));
+        //}else{
             //mark according entry as final and update value
             this.agreements.get(req.seq).complete=true;
             this.agreements.get(req.seq).v_a =req.v_a;
-        }
+        //}
         this.mutex.unlock();
         return new Response("Done", this.agreements.get(req.seq).n_a, this.agreements.get(req.seq).v_a);
     }
