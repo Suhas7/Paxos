@@ -42,7 +42,7 @@ public class Paxos implements PaxosRMI, Runnable{
         // Your initialization code here
         this.agreements = new HashMap<>();
         this.doneStamps = new ArrayList<>(Arrays.asList(new Integer[peers.length]));
-        Collections.fill(this.doneStamps,0);
+        Collections.fill(this.doneStamps,-1);
         // register peers, do not modify this part
         try{
             System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
@@ -176,7 +176,7 @@ public class Paxos implements PaxosRMI, Runnable{
     }
 
     public Response Accept(Request req){
-        assert req.type.equals("Accept");
+        // assert req.type.equals("Accept");
         this.mutex.lock();
         if(!this.agreements.containsKey(req.seq)){
             this.agreements.put(req.seq,new Agreement(req.p_n, req.p_n,req.v_a));
