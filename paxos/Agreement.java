@@ -21,6 +21,6 @@ public class Agreement {
 
     public Agreement(boolean complete, Serializable val){
         this.complete=complete;
-        this.v_a =(Integer) val;
+        this.v_a = val;
     }
 }

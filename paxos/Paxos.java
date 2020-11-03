@@ -123,7 +123,9 @@ public class Paxos implements PaxosRMI, Runnable{
             int count = 1;
             final int majority = 1+this.peers.length/2;
             for(int port = 0; port < this.ports.length; port++){
-                Response x = Call("Prepare", new Request(seq, n), port);
+                Response x;
+                if(port!=this.me) x = Call("Prepare", new Request(seq, n), port);
+                else x = this.Prepare(new Request(seq, n));
                 if(x!=null && x.responseType.equals("Ok")){
                     count++;
                     if(x.n > n){
@@ -135,7 +137,9 @@ public class Paxos implements PaxosRMI, Runnable{
             if(count<majority) continue;
             count = 0;
             for(int port = 0; port < this.ports.length; port++) {
-                Response x = Call("Accept", new Request("Accept", seq, n, val), port);
+                Response x;
+                if(port!=this.me) x = Call("Accept", new Request("Accept", seq, n, val), port);
+                else x = this.Accept(new Request("Accept", seq, n, val));
                 if (x != null && x.responseType.equals("AcceptOk")) count++;
             }
             if(count>=majority){
@@ -144,7 +148,8 @@ public class Paxos implements PaxosRMI, Runnable{
                 ag.v_a = val;
                 Response z = null;
                 for (int i = 0; i < this.peers.length; i++) {
-                    z = Call("Decide", new Request("Decide",seq, n, val), i);
+                    if(i != this.me) z = Call("Decide", new Request("Decide",seq, n, val), i);
+                    else z = this.Decide(new Request("Decide",seq, n, val));
                 }
                 return;
             }
