@@ -198,6 +198,7 @@ public class Paxos implements PaxosRMI, Runnable{
             this.agreements.put(req.seq,new Agreement(req.p_n, req.p_n,req.v_a));
         Agreement x = this.agreements.get(req.seq);
         if (req.p_n >=x.n_p){
+            x.n_p = req.p_n;
             x.n_a = req.p_n;
             x.v_a = req.v_a;
             x.complete = false;
