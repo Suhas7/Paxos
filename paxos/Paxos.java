@@ -42,7 +42,7 @@ public class Paxos implements PaxosRMI, Runnable{
         // Your initialization code here
         this.agreements = new HashMap<>();
         this.doneStamps = new ArrayList<>(Arrays.asList(new Integer[peers.length]));
-        Collections.fill(this.doneStamps,-1);
+        Collections.fill(this.doneStamps,0);
         // register peers, do not modify this part
         try{
             System.setProperty("java.rmi.server.hostname", this.peers[this.me]);
@@ -164,8 +164,8 @@ public class Paxos implements PaxosRMI, Runnable{
         }
         if(this.agreements.get(req.seq).n_p < req.p_n){
             //prepare better than previous prepare todo are the args right
+            this.agreements.put(req.seq,new Agreement(req.p_n,req.p_n,req.v_a));
             Agreement x = this.agreements.get(req.seq);
-            this.agreements.get(req.seq).n_p = req.p_n;
             this.mutex.unlock();
             return new Response("Ok",req.p_n,x.n_a,x.v_a);
         }else{
@@ -176,15 +176,15 @@ public class Paxos implements PaxosRMI, Runnable{
     }
 
     public Response Accept(Request req){
-        // assert req.type.equals("Accept");
+        assert req.type.equals("Accept");
         this.mutex.lock();
-        if(!this.agreements.containsKey(req.seq)){
+        if(!this.agreements.containsKey(req.seq))
             this.agreements.put(req.seq,new Agreement(req.p_n, req.p_n,req.v_a));
-        }
         Agreement x = this.agreements.get(req.seq);
         if (req.p_n >=x.n_p){
             x.n_a = req.p_n;
             x.v_a = req.v_a;
+            x.complete = false;
             this.mutex.unlock();
             return new Response("AcceptOk", x.n_a, x.v_a);
         }else{
