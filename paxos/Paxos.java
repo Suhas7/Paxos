@@ -272,8 +272,6 @@ public class Paxos implements PaxosRMI, Runnable{
          */
         int min = Collections.min(this.doneStamps);
 
-        if (min == 0) min = -1;
-
         /**
          * Paxos is required to have forgotten all information
          * about any instances it knows that are < Min().
