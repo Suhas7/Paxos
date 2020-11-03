@@ -138,7 +138,7 @@ public class Paxos implements PaxosRMI, Runnable{
             count = 0;
             for(int port = 0; port < this.ports.length; port++) {
                 Response x;
-                if(port!=this.me) x = Call("Accept", new Request("Accept", seq, n, val), port);
+                if(port != this.me) x = Call("Accept", new Request("Accept", seq, n, val), port);
                 else x = this.Accept(new Request("Accept", seq, n, val));
                 if (x != null && x.responseType.equals("AcceptOk")) count++;
             }
