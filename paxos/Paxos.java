@@ -120,12 +120,10 @@ public class Paxos implements PaxosRMI, Runnable{
 
         this.agreements.put(seq, new Agreement());
 
-        int n = -1;
         while(!this.isDead()){
             // get unique proposal id
-            // int n = this.proposalNum + this.peers.length;
-            //this.proposalNum = this.proposalNum + this.peers.length;
-            n = this.agreements.get(seq).n_p + this.me + 1;
+            int n = this.proposalNum + this.peers.length;
+            this.proposalNum = this.proposalNum + this.peers.length;
 
             // start counter for promise messages
             int count = 0;
@@ -164,7 +162,6 @@ public class Paxos implements PaxosRMI, Runnable{
                     Response x;
                     if (port != me) x = Call("Decide", acceptRequest, port);
                     else x = this.Decide(acceptRequest);
-
                     if(x != null) {
                         this.doneStamps.set(port, x.latestDone);
                     }
@@ -182,8 +179,6 @@ public class Paxos implements PaxosRMI, Runnable{
 
         if(!this.agreements.containsKey(req.seq)) {
             Agreement a = new Agreement();
-            a.n_p = req.p_n;
-            this.agreements.put(req.seq, a);
             this.mutex.unlock();
             return new Response("Ok", a.n_a, a.v_a, -1);
         }
@@ -207,9 +202,14 @@ public class Paxos implements PaxosRMI, Runnable{
         assert req.type.equals("Accept");
         this.mutex.lock();
 
-        Agreement a;
+        if(!this.agreements.containsKey(req.seq)) {
+            Agreement a = new Agreement();
+            this.mutex.unlock();
+            return new Response("AcceptOk", a.n_a, a.v_a, -1);
+        }
+
         if(this.agreements.containsKey(req.seq)) {
-            a = this.agreements.get(req.seq);
+            Agreement a = this.agreements.get(req.seq);
             if(a.n_p <= req.p_n){
                 //prepare better than previous prepare
                 a.n_p = req.p_n;
@@ -219,10 +219,6 @@ public class Paxos implements PaxosRMI, Runnable{
                 this.mutex.unlock();
                 return new Response("AcceptOk", a.n_a, a.v_a, -1);
             }
-        } else {
-            a = new Agreement();
-            this.mutex.unlock();
-            return new Response("AcceptOk", a.n_a, a.v_a, -1);
         }
 
         this.mutex.unlock();
@@ -260,7 +256,7 @@ public class Paxos implements PaxosRMI, Runnable{
         this.mutex.lock();
         if(seq > this.doneStamps.get(this.me)) {
             this.doneStamps.set(this.me, seq);
-            //this.Min();
+            this.Min();
         }
         this.mutex.unlock();
     }
@@ -301,6 +297,9 @@ public class Paxos implements PaxosRMI, Runnable{
          * Paxos-based servers.
          */
         //todo verify
+        for(Map.Entry<Integer,Agreement> entry : this.agreements.entrySet())
+            if(entry.getKey() < min && entry.getValue().state == Decided)
+                this.agreements.remove(entry.getKey());
 
         this.mutex.unlock();
         return min + 1;
@@ -314,7 +313,7 @@ public class Paxos implements PaxosRMI, Runnable{
      * it should not contact other Paxos peers.
      */
     public retStatus Status(int seq){
-        //if(seq<this.Min()) return new retStatus(Forgotten,null);
+        if(seq < this.Min()) return new retStatus(Forgotten,null);
         this.mutex.lock();
         Agreement a;
         if(this.agreements.containsKey((seq))) a = this.agreements.get(seq);
