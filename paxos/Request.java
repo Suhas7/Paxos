@@ -14,12 +14,9 @@ public class Request implements Serializable {
     public int seq;
     public int p_n;
     public Serializable v_a;
+
     // Your constructor and methods here
-    public Request(int seq, int n){
-        this.type = "Prepare";
-        this.seq = seq;
-        this.p_n = n;
-    }
+
     public Request(String type, int seq, int n, Serializable val){
         this.type = type;
         this.seq = seq;
