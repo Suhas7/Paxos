@@ -116,52 +116,60 @@ public class Paxos implements PaxosRMI, Runnable{
     public void run(){
         int seq = this.seq;
         Serializable val = this.val;
+        final int majority = 1 + this.peers.length / 2;
 
         this.agreements.put(seq, new Agreement());
 
+        int n = -1;
         while(!this.isDead()){
             // get unique proposal id
-            int n = this.proposalNum + this.peers.length;
-            this.proposalNum = this.proposalNum + this.peers.length;
-
-            final int majority = 1 + this.peers.length / 2;
+            // int n = this.proposalNum + this.peers.length;
+            //this.proposalNum = this.proposalNum + this.peers.length;
+            n = this.agreements.get(seq).n_p + this.me + 1;
 
             // start counter for promise messages
-            int count = 1;
+            int count = 0;
+            int highest_n_a = -1;
+            Serializable highest_v_a = null;
+            Request prepareRequest = new Request("Prepare", seq, n, val);
             for(int port = 0; port < this.ports.length; port++){
                 Response x;
-                if(port!=this.me) x = Call("Prepare", new Request(seq, n), port);
-                else x = this.Prepare(new Request(seq, n));
-                if(x!=null && x.responseType.equals("Ok")){
+                if(port != this.me) x = Call("Prepare", prepareRequest, port);
+                else x = this.Prepare(prepareRequest);
+                if(x != null && x.responseType.equals("Ok")){
                     count++;
-                    if(x.n > n){
-                        n = x.n;
-                        val = x.v_a;
+                    if(x.n_a > highest_n_a){
+                        highest_n_a = x.n_a;
+                        highest_v_a = x.v_a;
                     }
                 }
             }
+
             // no paxos iteration if promise messages is not priority
             if(count < majority) continue;
 
             // start counter for accept messages
-            count = 1;
+            count = 0;
+            Serializable accept_val = highest_v_a != null ? highest_v_a : val;
+            Request acceptRequest = new Request("Accept", seq, n, accept_val);
             for(int port = 0; port < this.ports.length; port++) {
                 Response x;
-                if(port != this.me) x = Call("Accept", new Request("Accept", seq, n, val), port);
-                else x = this.Accept(new Request("Accept", seq, n, val));
+                if(port != this.me) x = Call("Accept", acceptRequest, port);
+                else x = this.Accept(acceptRequest);
                 if (x != null && x.responseType.equals("AcceptOk")) count++;
             }
 
-
             if(count >= majority){
-                Agreement ag = this.agreements.get(seq);
-                ag.complete=true;
-                ag.v_a = val;
-                Response z = null;
-                for (int i = 0; i < this.peers.length; i++) {
-                    if(i != this.me) z = Call("Decide", new Request("Decide",seq, n, val), i);
-                    else z = this.Decide(new Request("Decide",seq, n, val));
+                for(int port = 0; port < this.ports.length; port++) {
+                    Response x;
+                    if (port != me) x = Call("Decide", acceptRequest, port);
+                    else x = this.Decide(acceptRequest);
+
+                    if(x != null) {
+                        this.doneStamps.set(port, x.latestDone);
+                    }
                 }
+
                 return;
             }
         }
@@ -171,58 +179,69 @@ public class Paxos implements PaxosRMI, Runnable{
     public Response Prepare(Request req){
         assert req.type.equals("Prepare");
         this.mutex.lock();
-        if(!this.agreements.containsKey(req.seq)){
-            //no prepare with this seq has been seen
-            this.agreements.put(req.seq, new Agreement(req.p_n,req.p_n,req.v_a));
-            Agreement x = this.agreements.get(req.seq);
+
+        if(!this.agreements.containsKey(req.seq)) {
+            Agreement a = new Agreement();
+            a.n_p = req.p_n;
+            this.agreements.put(req.seq, a);
             this.mutex.unlock();
-            return new Response("Ok", req.p_n,x.n_a,x.v_a);
+            return new Response("Ok", a.n_a, a.v_a, -1);
         }
-        if(this.agreements.get(req.seq).n_p < req.p_n){
-            //prepare better than previous prepare todo are the args right
-            this.agreements.put(req.seq,new Agreement(req.p_n,req.p_n,req.v_a));
-            Agreement x = this.agreements.get(req.seq);
-            this.mutex.unlock();
-            return new Response("Ok",req.p_n,x.n_a,x.v_a);
-        }else{
-            //prepare failed, prop value too low
-            this.mutex.unlock();
-            return new Response("Reject");
+
+        if(this.agreements.containsKey(req.seq)) {
+            Agreement a = this.agreements.get(req.seq);
+            if(a.n_p < req.p_n){
+                //prepare better than previous prepare
+                a.n_p = req.p_n;
+                this.agreements.put(req.seq, a);
+                this.mutex.unlock();
+                return new Response("Ok", a.n_a, a.v_a, -1);
+            }
         }
+
+        this.mutex.unlock();
+        return new Response("Reject");
     }
 
     public Response Accept(Request req){
         assert req.type.equals("Accept");
         this.mutex.lock();
-        if(!this.agreements.containsKey(req.seq))
-            this.agreements.put(req.seq,new Agreement(req.p_n, req.p_n,req.v_a));
-        Agreement x = this.agreements.get(req.seq);
-        if (req.p_n >=x.n_p){
-            x.n_p = req.p_n;
-            x.n_a = req.p_n;
-            x.v_a = req.v_a;
-            x.complete = false;
+
+        Agreement a;
+        if(this.agreements.containsKey(req.seq)) {
+            a = this.agreements.get(req.seq);
+            if(a.n_p <= req.p_n){
+                //prepare better than previous prepare
+                a.n_p = req.p_n;
+                a.n_a = req.p_n;
+                a.v_a = req.v_a;
+                this.agreements.put(req.seq, a);
+                this.mutex.unlock();
+                return new Response("AcceptOk", a.n_a, a.v_a, -1);
+            }
+        } else {
+            a = new Agreement();
             this.mutex.unlock();
-            return new Response("AcceptOk", x.n_a, x.v_a);
-        }else{
-            this.mutex.unlock();
-            return new Response("AcceptReject");
+            return new Response("AcceptOk", a.n_a, a.v_a, -1);
         }
+
+        this.mutex.unlock();
+        return new Response("AcceptReject");
     }
 
     public Response Decide(Request req){
-        assert req.type.equals("Decide");
         this.mutex.lock();
-        //if(!this.agreements.containsKey(req.seq)){
-            //make agreement w known value and mark as final
-        //    this.agreements.put(req.seq,new Agreement(true,req.v_a));
-        //}else{
-            //mark according entry as final and update value
-            this.agreements.get(req.seq).complete=true;
-            this.agreements.get(req.seq).v_a =req.v_a;
-        //}
+        //assert req.type.equals("Decide");
+        if(!this.agreements.containsKey(req.seq)) this.agreements.put(req.seq, new Agreement());
+        Agreement a = this.agreements.get(req.seq);
+
+        a.state = Decided;
+        a.n_a = req.p_n;
+        a.v_a = req.v_a;
+        int latestDone = this.doneStamps.get(this.me);
+
         this.mutex.unlock();
-        return new Response("Done", this.agreements.get(req.seq).n_a, this.agreements.get(req.seq).v_a);
+        return new Response("Done", a.n_a, a.v_a, latestDone);
     }
 
     /**
@@ -238,10 +257,12 @@ public class Paxos implements PaxosRMI, Runnable{
      * until after the next instance is agreed to."
      */
     public void Done(int seq) {
-        if(seq>this.doneStamps.get(this.me)) {
+        this.mutex.lock();
+        if(seq > this.doneStamps.get(this.me)) {
             this.doneStamps.set(this.me, seq);
-//            this.Min();
+            //this.Min();
         }
+        this.mutex.unlock();
     }
 
 
@@ -280,12 +301,9 @@ public class Paxos implements PaxosRMI, Runnable{
          * Paxos-based servers.
          */
         //todo verify
-        for(Map.Entry<Integer,Agreement> entry : this.agreements.entrySet())
-            if(entry.getKey()<min && entry.getValue().complete)
-                this.agreements.remove(entry.getKey());
 
         this.mutex.unlock();
-        return min+1;
+        return min + 1;
     }
 
     /**
@@ -298,11 +316,13 @@ public class Paxos implements PaxosRMI, Runnable{
     public retStatus Status(int seq){
         //if(seq<this.Min()) return new retStatus(Forgotten,null);
         this.mutex.lock();
-        boolean decided;
-        if(!this.agreements.containsKey(seq)) decided = false;
-        else decided = this.agreements.get(seq).complete;
+        Agreement a;
+        if(this.agreements.containsKey((seq))) a = this.agreements.get(seq);
+        else a = new Agreement();
+
         this.mutex.unlock();
-        return decided ? new retStatus(Decided,this.agreements.get(seq).v_a) : new retStatus(Pending,null);
+
+        return new retStatus(a.state, a.v_a);
     }
 
     /**
