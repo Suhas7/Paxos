@@ -47,22 +47,28 @@ public class Server implements KVPaxosRMI {
 
     // RMI handlers
     public Response Get(Request req){
-        // Todo Your code here
-        return null;
+        if(!this.map.containsKey(req.op.key)) return new Response();
+        else return new Response(this.map.get(req.op.key));
     }
 
     public Response Put(Request req){
-        // Todo Your code here
-        return null;
+        while(this.px.Status(this.seq).state==State.Decided){
+            Op curr = (Op) this.px.Status(this.seq++).v;
+            if(curr.op.equals("Put")) this.map.put(curr.key, curr.value);
+        }
+        this.px.Start(this.seq, req.op);
+        this.wait(this.seq);
+        this.map.put(req.op.key,req.op.value);
+        return new Response(req.op);
+    }
     public Op wait(int seq){
         int to = 10;
         while(true){
             Paxos.retStatus ret = this.px.Status(seq);
-            if ( ret.state == State.Decided ) return Op.class.cast(ret.v);
-            try{ Thread.sleep(to);
-            } catch ( Exception e ){e.printStackTrace();};
-            if ( to < 1000 )to *= 2;
+            if(ret.state == State.Decided) return Op.class.cast(ret.v);
+            try{Thread.sleep(to);
+            } catch (Exception e){e.printStackTrace();};
+            if(to < 1000) to *= 2;
         }
     }
-
 }

@@ -8,13 +8,10 @@ import static org.junit.Assert.*;
  * For your reference only.
  */
 public class KVPaxosTest {
-
-
     public void check(Client ck, String key, Integer value){
         Integer v = ck.Get(key);
         assertTrue("Get(" + key + ")->" + v + ", expected " + value, v.equals(value));
     }
-
     @Test
     public void TestBasic(){
         final int npaxos = 5;
