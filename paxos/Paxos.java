@@ -4,6 +4,7 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.Registry;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import static paxos.State.*;
@@ -21,7 +22,7 @@ public class Paxos implements PaxosRMI, Runnable{
     AtomicBoolean dead;// for testing
     AtomicBoolean unreliable;// for testing
     // Your data here
-    private HashMap<Integer, Agreement> agreements;
+    private Map<Integer, Agreement> agreements;
     private List<Integer> doneStamps;
     private int proposalNum;
     private int seq;
@@ -39,7 +40,7 @@ public class Paxos implements PaxosRMI, Runnable{
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
         // Your initialization code here
-        this.agreements = new HashMap<>();
+        this.agreements = new ConcurrentHashMap<>();
         this.doneStamps = new ArrayList<>(Arrays.asList(new Integer[peers.length]));
         this.proposalNum = this.me - this.peers.length;
         Collections.fill(this.doneStamps,-1);
@@ -293,8 +294,11 @@ public class Paxos implements PaxosRMI, Runnable{
      * it should not contact other Paxos peers.
      */
     public retStatus Status(int seq){
-        if(seq < this.Min()) return new retStatus(Forgotten,null);
         this.mutex.lock();
+        if(seq < this.Min()){
+          this.mutex.unlock();
+            return new retStatus(Forgotten,null);
+        }
         Agreement a;
         if(this.agreements.containsKey((seq))) a = this.agreements.get(seq);
         else a = new Agreement();
