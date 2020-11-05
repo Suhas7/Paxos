@@ -9,7 +9,6 @@ public class Client {
     int[] ports;
     // Your data here
     private int seq;
-
     public Client(String[] servers, int[] ports){
         this.servers = servers;
         this.ports = ports;

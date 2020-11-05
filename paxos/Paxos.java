@@ -6,7 +6,6 @@ import java.rmi.registry.Registry;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
-
 import static paxos.State.*;
 
 /**
@@ -27,7 +26,6 @@ public class Paxos implements PaxosRMI, Runnable{
     private int proposalNum;
     private int seq;
     private Serializable val;
-
     /**
      * Call the constructor to create a Paxos peer.
      * The hostnames of all the Paxos peers (including this one)
@@ -117,14 +115,11 @@ public class Paxos implements PaxosRMI, Runnable{
         int seq = this.seq;
         Serializable val = this.val;
         final int majority = 1 + this.peers.length / 2;
-
         this.agreements.put(seq, new Agreement());
-
         while(!this.isDead()){
             // get unique proposal id
             int n = this.proposalNum + this.peers.length;
             this.proposalNum = this.proposalNum + this.peers.length;
-
             // start counter for promise messages
             int count = 0;
             int highest_n_a = -1;
@@ -142,10 +137,8 @@ public class Paxos implements PaxosRMI, Runnable{
                     }
                 }
             }
-
             // no paxos iteration if promise messages is not priority
             if(count < majority) continue;
-
             // start counter for accept messages
             count = 0;
             Serializable accept_val = highest_v_a != null ? highest_v_a : val;
@@ -156,7 +149,6 @@ public class Paxos implements PaxosRMI, Runnable{
                 else x = this.Accept(acceptRequest);
                 if (x != null && x.responseType.equals("AcceptOk")) count++;
             }
-
             if(count >= majority){
                 for(int port = 0; port < this.ports.length; port++) {
                     Response x;
@@ -166,7 +158,6 @@ public class Paxos implements PaxosRMI, Runnable{
                         this.doneStamps.set(port, x.latestDone);
                     }
                 }
-
                 return;
             }
         }
@@ -176,13 +167,11 @@ public class Paxos implements PaxosRMI, Runnable{
     public Response Prepare(Request req){
         assert req.type.equals("Prepare");
         this.mutex.lock();
-
         if(!this.agreements.containsKey(req.seq)) {
             Agreement a = new Agreement();
             this.mutex.unlock();
             return new Response("Ok", a.n_a, a.v_a, -1);
         }
-
         if(this.agreements.containsKey(req.seq)) {
             Agreement a = this.agreements.get(req.seq);
             if(a.n_p < req.p_n){
@@ -193,7 +182,6 @@ public class Paxos implements PaxosRMI, Runnable{
                 return new Response("Ok", a.n_a, a.v_a, -1);
             }
         }
-
         this.mutex.unlock();
         return new Response("Reject");
     }
@@ -201,13 +189,11 @@ public class Paxos implements PaxosRMI, Runnable{
     public Response Accept(Request req){
         assert req.type.equals("Accept");
         this.mutex.lock();
-
         if(!this.agreements.containsKey(req.seq)) {
             Agreement a = new Agreement();
             this.mutex.unlock();
             return new Response("AcceptOk", a.n_a, a.v_a, -1);
         }
-
         if(this.agreements.containsKey(req.seq)) {
             Agreement a = this.agreements.get(req.seq);
             if(a.n_p <= req.p_n){
@@ -220,7 +206,6 @@ public class Paxos implements PaxosRMI, Runnable{
                 return new Response("AcceptOk", a.n_a, a.v_a, -1);
             }
         }
-
         this.mutex.unlock();
         return new Response("AcceptReject");
     }
@@ -230,12 +215,10 @@ public class Paxos implements PaxosRMI, Runnable{
         //assert req.type.equals("Decide");
         if(!this.agreements.containsKey(req.seq)) this.agreements.put(req.seq, new Agreement());
         Agreement a = this.agreements.get(req.seq);
-
         a.state = Decided;
         a.n_a = req.p_n;
         a.v_a = req.v_a;
         int latestDone = this.doneStamps.get(this.me);
-
         this.mutex.unlock();
         return new Response("Done", a.n_a, a.v_a, latestDone);
     }
@@ -260,7 +243,6 @@ public class Paxos implements PaxosRMI, Runnable{
         }
         this.mutex.unlock();
     }
-
 
     /**
      * The application wants to know the
@@ -289,7 +271,6 @@ public class Paxos implements PaxosRMI, Runnable{
          * never called Done().
          */
         int min = Collections.min(this.doneStamps);
-
         /**
          * Paxos is required to have forgotten all information
          * about any instances it knows that are < Min().
@@ -300,7 +281,6 @@ public class Paxos implements PaxosRMI, Runnable{
         for(Map.Entry<Integer,Agreement> entry : this.agreements.entrySet())
             if(entry.getKey() < min && entry.getValue().state == Decided)
                 this.agreements.remove(entry.getKey());
-
         this.mutex.unlock();
         return min + 1;
     }
@@ -318,9 +298,7 @@ public class Paxos implements PaxosRMI, Runnable{
         Agreement a;
         if(this.agreements.containsKey((seq))) a = this.agreements.get(seq);
         else a = new Agreement();
-
         this.mutex.unlock();
-
         return new retStatus(a.state, a.v_a);
     }
 

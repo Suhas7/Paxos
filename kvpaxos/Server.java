@@ -12,19 +12,15 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class Server implements KVPaxosRMI {
-
     ReentrantLock mutex;
     Registry registry;
     Paxos px;
     int me, seq;
-
     String[] servers;
     int[] ports;
     KVPaxosRMI stub;
-
     // Your definitions here
     Map<String, Serializable> map = new HashMap<>();
-
     public Server(String[] servers, int[] ports, int me){
         this.me = me;
         this.servers = servers;
@@ -33,7 +29,6 @@ public class Server implements KVPaxosRMI {
         this.px = new Paxos(me, servers, ports);
         // Your initialization code here
         this.seq = 0;
-
         try{
             System.setProperty("java.rmi.server.hostname", this.servers[this.me]);
             registry = LocateRegistry.getRegistry(this.ports[this.me]);
