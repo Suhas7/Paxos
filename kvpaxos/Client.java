@@ -7,9 +7,8 @@ import java.rmi.registry.Registry;
 public class Client {
     String[] servers;
     int[] ports;
-
     // Your data here
-
+    private int seq;
 
     public Client(String[] servers, int[] ports){
         this.servers = servers;
@@ -50,12 +49,26 @@ public class Client {
 
     // RMI handlers
     public Integer Get(String key){
-        // todo Your code here
+        Response goodResponse = new Response();
+        Request myReq = new Request(new Op("Get",this.seq++,key,null));
+        for(int i = 0; i<this.ports.length; i++){
+            Response currResponse = Call("Get",myReq,i);
+            if(currResponse!=null && currResponse.success){
+                goodResponse=currResponse;
+                return (Integer) goodResponse.value;
+            }
+        }
         return 42;
     }
 
     public boolean Put(String key, Integer value){
-        // todo Your code here
+        Request myReq = new Request(new Op("Put",this.seq++,key,value));
+        for(int i = 0; i<this.ports.length; i++){
+            Response currResponse = Call("Put",myReq,i);
+            if(currResponse!=null && currResponse.success){
+                return true;
+            }
+        }
         return false;
     }
 

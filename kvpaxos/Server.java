@@ -44,7 +44,6 @@ public class Server implements KVPaxosRMI {
         }
     }
 
-
     // RMI handlers
     public Response Get(Request req){
         if(!this.map.containsKey(req.op.key)) return new Response();
