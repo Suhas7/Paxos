@@ -21,7 +21,6 @@ public class KVPaxosTest {
         String host = "127.0.0.1";
         String[] peers = new String[npaxos];
         int[] ports = new int[npaxos];
-
         Server[] kva = new Server[npaxos];
         for(int i = 0 ; i < npaxos; i++){
             ports[i] = 1100+i;
@@ -30,16 +29,12 @@ public class KVPaxosTest {
         for(int i = 0; i < npaxos; i++){
             kva[i] = new Server(peers, ports, i);
         }
-
         Client ck = new Client(peers, ports);
         System.out.println("Test: Basic put/get ...");
         ck.Put("app", 6);
         check(ck, "app", 6);
         ck.Put("a", 70);
         check(ck, "a", 70);
-
         System.out.println("... Passed");
-
     }
-
 }

@@ -10,7 +10,6 @@ public class Op implements Serializable{
     int ClientSeq;
     String key;
     Integer value;
-
     public Op(String op, int ClientSeq, String key, Integer value){
         this.op = op;
         this.ClientSeq = ClientSeq;
