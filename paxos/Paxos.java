@@ -5,6 +5,7 @@ import java.rmi.server.UnicastRemoteObject;
 import java.rmi.registry.Registry;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import static paxos.State.*;
@@ -24,6 +25,7 @@ public class Paxos implements PaxosRMI, Runnable{
     // Your data here
     private Map<Integer, Agreement> agreements;
     private List<Integer> doneStamps;
+    private Queue<Param> params = new ConcurrentLinkedDeque<>();
     private int proposalNum;
     private int seq;
     private Serializable val;
@@ -40,7 +42,7 @@ public class Paxos implements PaxosRMI, Runnable{
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
         // Your initialization code here
-        this.agreements = new ConcurrentHashMap<>();
+        this.agreements = new HashMap<>();
         this.doneStamps = new ArrayList<>(Arrays.asList(new Integer[peers.length]));
         this.proposalNum = this.me - this.peers.length;
         Collections.fill(this.doneStamps,-1);
@@ -105,16 +107,18 @@ public class Paxos implements PaxosRMI, Runnable{
      * The application will call Status() to find out if/when agreement
      * is reached.
      */
-    public void Start(int seq, Serializable value){
-        this.seq = seq;
-        this.val = value;
+    public synchronized void Start(int seq, Serializable value){
+        this.mutex.lock();
+        this.params.add(new Param(seq,value));
         new Thread(this).start();
+        this.mutex.unlock();
     }
 
     @Override
     public void run(){
-        int seq = this.seq;
-        Serializable val = this.val;
+        Param prm = this.params.poll();
+        int seq = prm.seq;
+        Serializable val = prm.val;
         final int majority = 1 + this.peers.length / 2;
         this.agreements.put(seq, new Agreement());
         while(!this.isDead()){
@@ -254,7 +258,13 @@ public class Paxos implements PaxosRMI, Runnable{
      * highest instance sequence known to
      * this peer.
      */
-    public int Max(){ return Collections.max(this.agreements.keySet()); }
+    public int Max(){
+        int max;
+        this.mutex.lock();
+        max = Collections.max(this.agreements.keySet());
+        this.mutex.unlock();
+        return max;
+    }
 
     /**
      * The fact that Min() is defined as a minimum over
@@ -282,7 +292,6 @@ public class Paxos implements PaxosRMI, Runnable{
          * The point is to free up memory in long-running
          * Paxos-based servers.
          */
-        //todo verify
         for(Map.Entry<Integer,Agreement> entry : this.agreements.entrySet())
             if(entry.getKey() < min && entry.getValue().state == Decided)
                 this.agreements.remove(entry.getKey());
@@ -361,5 +370,13 @@ public class Paxos implements PaxosRMI, Runnable{
             this.state = State.Pending;
         }
 
+    }
+    public class Param{
+        public int seq;
+        public Serializable val;
+        public Param(int seq, Serializable val){
+            this.seq=seq;
+            this.val=val;
+        }
     }
 }
