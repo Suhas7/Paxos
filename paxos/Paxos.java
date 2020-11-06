@@ -42,7 +42,7 @@ public class Paxos implements PaxosRMI, Runnable{
         this.dead = new AtomicBoolean(false);
         this.unreliable = new AtomicBoolean(false);
         // Your initialization code here
-        this.agreements = new HashMap<>();
+        this.agreements = new ConcurrentHashMap<>();
         this.doneStamps = new ArrayList<>(Arrays.asList(new Integer[peers.length]));
         this.proposalNum = this.me - this.peers.length;
         Collections.fill(this.doneStamps,-1);
@@ -248,7 +248,7 @@ public class Paxos implements PaxosRMI, Runnable{
         this.mutex.lock();
         if(seq > this.doneStamps.get(this.me)) {
             this.doneStamps.set(this.me, seq);
-            this.Min();
+            //this.Min();
         }
         this.mutex.unlock();
     }
